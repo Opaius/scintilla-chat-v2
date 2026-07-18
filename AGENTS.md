@@ -2,7 +2,9 @@
 
 - **Language**: TypeScript
 - **Package Manager**: bun
-- **Add-ons**: remult
+- **Add-ons**: remult, PandaCSS, Ark UI Svelte
+- **Design**: `docs/DESIGN.md` (Google Labs format) + PandaCSS theme tokens
+
 
 ---
 
@@ -91,13 +93,61 @@ When the user requests a durable behavior change, record it here or in the relev
 ### src/
 | Child | Scope |
 |---|---|
-| `src/lib/AGENTS.md` | Remult config, Svelte 5 reactivity, entities, server API setup |
+| `src/lib/AGENTS.md` | Entities, server API, auth config, tenant scoping |
 
 ### src/routes/
 No child doc — simple page + remote function + API catch-all route + Better Auth handler.
+
+### docs/
+| Child | Scope |
+|---|---|
+| `docs/AGENTS.md` | Planning docs index, multi-tenancy architecture reference |
+
 
 ### Better Auth
 
 - `src/routes/api/auth/[...auth]/+server.ts` — routes to `auth.handler`
 - Remult adapter `@nerdfolio/remult-better-auth` connects Better Auth to Remult's dataProvider
 - Entities auto-generated via `@better-auth/cli generate`
+
+### PandaCSS
+
+- Config at `panda.config.ts` — includes `src/**/*.svelte` files
+- PostCSS via `postcss.config.cjs` — `@pandacss/dev/postcss` plugin
+- Layer definitions at `src/app.css` — imported in `+layout.svelte`
+- Generated utilities in `styled-system/` — gitignored, regenerate via `bunx panda codegen` after config changes
+- CSS utilities import from `styled-system/css`, patterns from `styled-system/patterns`
+
+### docs/DESIGN.md
+
+- `docs/DESIGN.md` — Google Labs design spec format
+- Defines colors, typography, spacing, radii, elevation, and component patterns
+- PandaCSS `panda.config.ts` tokens mirror the DESIGN.md values
+- Run `bunx panda codegen` after changing either file to regenerate `styled-system/`
+
+## Build Workflow
+
+- `bun run build` — runs `panda codegen` (via postcss), SvelteKit build, Cloudflare adapter
+- `bun run check` — runs all checks via `scripts/check-all.sh`: svelte-kit sync → svelte-check → tsc → biome → fallow. Only outputs findings.
+- `bun run format` — `biome format --write src/`
+- `bun run lint` — `biome check --write src/`
+
+### Biome
+
+- Config at `biome.json` — v2.5.4 with Svelte support via `html.experimentalFullSupportEnabled`
+- Svelte-specific nursery rules enabled: `noSvelteUnnecessaryStateWrap` (error), `useSvelteRequireEachKey` (warn)
+- Uses `.gitignore` via VCS integration; additional excludes for `styled-system`, `.svelte-kit`, `build`, `.wrangler`, `packages`
+- Quote style: single; semicolons: as-needed
+
+### Fallow
+
+- Config at `fallow.toml` — dead code, duplication, dependency, and complexity analysis
+- Entry: `src/**/*.{ts,svelte}`
+- Duplicate detection ignores generated dirs; `minOccurrences = 3`
+- Run standalone: `bun x fallow`
+
+## Multi-Tenancy
+
+Single D1 database, all rows scoped by `organizationId` on `user`, `session`, `account`.
+See `docs/AGENTS.md` for the full architecture breakdown and `docs/multi-tenancy-plan.md`
+for the complete plan (evolution path, security, edge cases).

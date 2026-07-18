@@ -1,5 +1,6 @@
 name = "scintilla-chat"
 compatibility_date = "2025-07-16"
+compatibility_flags = ["nodejs_als"]
 pages_build_output_dir = "./build"
 
 [[d1_databases]]

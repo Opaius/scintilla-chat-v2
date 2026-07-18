@@ -1,0 +1,12 @@
+# fallow.toml — Codebase analysis configuration
+
+entry = ["src/**/*.{ts,svelte}"]
+
+[duplicates]
+minOccurrences = 3
+ignore_dependencies = ["@ark-ui/svelte", "@sveltejs/kit", "remult", "svelte"]
+
+[rules]
+unused-dependencies = "warn"
+unused-dev-dependencies = "off"
+dev-dependency-in-production = "off"

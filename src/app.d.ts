@@ -8,10 +8,10 @@ declare global {
 		// interface PageState {}
 		interface Platform {
 			env?: {
-				DB: D1Database;
-			};
+				DB: D1Database
+			}
 		}
 	}
 }
 
-export {};
+export {}

@@ -8,13 +8,21 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check": "bash scripts/check-all.sh",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest run",
+		"format": "biome format --write src/",
+		"lint": "biome check --write src/"
+	},
+	"dependencies": {
+		"@ark-ui/svelte": "^5.22.1",
+		"@nerdfolio/remult-better-auth": "^0.4.3",
+		"better-auth": "^1.6.23"
 	},
 	"devDependencies": {
-		"@babel/plugin-proposal-decorators": "^8.0.2",
+		"@biomejs/biome": "^2.5.4",
 		"@cloudflare/workers-types": "^5.20260716.1",
-		"@rolldown/plugin-babel": "^0.2.3",
+		"@pandacss/dev": "^1.11.4",
 		"@sveltejs/adapter-cloudflare": "^7.0.1",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -23,16 +31,13 @@
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3",
 		"vite": "^8.0.16",
-		"wrangler": "^4.0.0"
+		"vitest": "^4.1.10",
+		"wrangler": "^4.0.0",
+		"esbuild": "*"
 	},
 	"allowScripts": {
 		"@sveltejs/kit": true,
 		"esbuild": true,
 		"wrangler": true
-	},
-	"dependencies": {
-		"@better-auth/cli": "^1.4.21",
-		"@nerdfolio/remult-better-auth": "^0.4.3",
-		"better-auth": "^1.6.23"
 	}
 }

@@ -1,3 +1,3 @@
-import { api } from '$lib/server/api';
+import { api } from '$lib/server/api'
 
-export const { GET, POST, PUT, DELETE } = api;
+export const { GET, POST, PUT, DELETE } = api
