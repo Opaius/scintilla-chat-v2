@@ -15,20 +15,27 @@ export async function handleBillingWebhook(providerKey: string, rawBody: string,
 	if (!provider) throw new Error(`Unknown billing provider: ${providerKey}`)
 	const signature = headers.get(provider.signatureHeader) ?? ''
 	// Flow A (our plans): a single global secret for the platform's provider.
-	// Flow B (reader integrations): secret is per-org — resolve after parsing.
+	// Flow B (reader integrations) needs a per-org secret resolved after parsing
+	// the payload — tracked as a seam gap (getSecret receives the org post-parse).
 	const secret = await provider.getSecret('*')
 	if (!secret) throw new Error(`No webhook secret for provider ${providerKey}`)
 	if (!(await provider.verify(rawBody, signature, secret))) {
 		throw new Error('Invalid webhook signature')
 	}
-	for (const event of await provider.map(rawBody)) {
-		await applyEvent(event, providerKey)
+	const events = await provider.map(rawBody)
+	// Process each event independently so one failure doesn't drop the rest.
+	for (const event of events) {
+		try {
+			await applyEvent(event, providerKey)
+		} catch (err) {
+			console.error(`[billing] applyEvent failed for ${event.type}:`, err)
+		}
 	}
 }
 
 async function applyEvent(event: BillingEvent, providerKey: string) {
 	// Run inside the event's tenant context so the entity apiPrefilter isolates
-	// the write to the correct org.
+	// the write to the correct org and the saving interceptor stamps it.
 	await runWithTenantContext({ organizationId: event.organizationId, domain: '' }, async () => {
 		switch (event.type) {
 			case 'subscription.active':
@@ -48,6 +55,23 @@ async function applyEvent(event: BillingEvent, providerKey: string) {
 					},
 				})
 				break
+			case 'subscription.updated': {
+				const set: Partial<Subscription> = {
+					status: event.status ?? 'active',
+					cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
+				}
+				if (event.periodStart) set.currentPeriodStart = new Date(event.periodStart)
+				if (event.periodEnd) set.currentPeriodEnd = new Date(event.periodEnd)
+				if (event.planId) set.planId = event.planId
+				await remult.repo(Subscription).upsert({
+					where: {
+						organizationId: event.organizationId,
+						providerSubscriptionId: event.providerSubscriptionId,
+					},
+					set,
+				})
+				break
+			}
 			case 'subscription.canceled':
 			case 'subscription.past_due':
 				await remult.repo(Subscription).update(

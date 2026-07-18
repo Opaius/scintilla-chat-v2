@@ -12,6 +12,16 @@ export type BillingEvent =
 			periodStart?: string
 			periodEnd?: string
 	  }
+	| {
+			type: 'subscription.updated'
+			organizationId: string
+			providerSubscriptionId: string
+			planId?: string
+			status?: string
+			cancelAtPeriodEnd?: boolean
+			periodStart?: string
+			periodEnd?: string
+	  }
 	| { type: 'subscription.canceled'; organizationId: string; providerSubscriptionId: string }
 	| { type: 'subscription.past_due'; organizationId: string; providerSubscriptionId: string }
 	| {

@@ -1,4 +1,4 @@
-import { Allow, Entity, Fields } from 'remult'
+import { Allow, Entity, Fields, Validators } from 'remult'
 import { orgApiPrefilter } from '../tenant-context.js'
 import { Roles } from './auth.js'
 
@@ -30,6 +30,8 @@ export class Plan {
 }
 
 // Subscription: an org's active plan (Flow A). Tenant-scoped.
+// providerSubscriptionId is globally unique per provider, so Validators.unique
+// gives us idempotent upserts across orgs.
 @Entity<Subscription>('subscription', {
 	allowApiCrud: Roles.admin,
 	allowApiRead: Allow.authenticated,
@@ -42,9 +44,9 @@ export class Subscription {
 	organizationId = ''
 	@Fields.string({ required: true })
 	planId = ''
-	@Fields.string({ required: true }) // creem | dodo | stripe | paddle | ...
+	@Fields.string({ required: true })
 	provider = ''
-	@Fields.string()
+	@Fields.string({ required: true, validate: Validators.unique() })
 	providerSubscriptionId = ''
 	@Fields.string({ defaultValue: () => 'active' })
 	status = 'active' // active | trialing | past_due | canceled
@@ -60,7 +62,8 @@ export class Subscription {
 	updatedAt!: Date
 }
 
-// CreditBalance: running minutes/credits per org. Tenant-scoped.
+// CreditBalance: running minutes/credits per org. Exactly one per org
+// (organizationId is unique); getCreditBalance upserts idempotently.
 @Entity<CreditBalance>('credit_balance', {
 	allowApiCrud: Roles.admin,
 	allowApiRead: Allow.authenticated,
@@ -69,7 +72,7 @@ export class Subscription {
 export class CreditBalance {
 	@Fields.string({ required: true, defaultValue: () => crypto.randomUUID() })
 	id!: string
-	@Fields.string({ required: true })
+	@Fields.string({ required: true, validate: Validators.unique() })
 	organizationId = ''
 	@Fields.number({ defaultValue: () => 0 })
 	minutesTotal = 0
@@ -79,12 +82,15 @@ export class CreditBalance {
 	creditsTotal = 0
 	@Fields.number({ defaultValue: () => 0 })
 	creditsUsed = 0
+	@Fields.createdAt({ required: true, defaultValue: () => new Date(), allowApiUpdate: false })
+	createdAt!: Date
 	@Fields.updatedAt({ required: true, defaultValue: () => new Date(), allowApiUpdate: false })
 	updatedAt!: Date
 }
 
 // ConsumptionEvent: ledger of consumed minutes/credits. Drives Flow A metering
-// and Flow B (reader's client) billing. Tenant-scoped.
+// and Flow B (reader's client) billing. Tenant-scoped. Flow B redeliveries are
+// de-duped on (billingProvider, billingRef) in recordConsumption.
 @Entity<ConsumptionEvent>('consumption_event', {
 	allowApiCrud: Roles.admin,
 	allowApiRead: Allow.authenticated,
@@ -106,7 +112,7 @@ export class ConsumptionEvent {
 	@Fields.string()
 	billingProvider = '' // Flow B: which integration billed the client
 	@Fields.string()
-	billingRef = '' // provider txn id
+	billingRef = '' // provider txn id (Flow B dedupe key)
 	@Fields.boolean({ defaultValue: () => false })
 	billed = false // whether the client was charged (Flow B)
 	@Fields.createdAt({ required: true, defaultValue: () => new Date(), allowApiUpdate: false })
@@ -129,6 +135,11 @@ export class PaymentIntegration {
 	provider = ''
 	@Fields.boolean({ defaultValue: () => true })
 	enabled = true
+	// ponytail: SECURITY DEBT — PaymentIntegration.config holds reader-side provider
+	// secrets (Stripe/PayPal/crypto keys, webhook secrets) in plaintext in D1. For Flow B
+	// these are the reader's own credentials, not ours, but a DB/dump leak exposes them.
+	// TODO(security): encrypt at rest (envelope encryption via a secret store) or keep only
+	// a secret-manager reference id. Owner: billing/security.
 	@Fields.json()
 	config: Record<string, string> = {}
 	@Fields.createdAt({ required: true, defaultValue: () => new Date(), allowApiUpdate: false })

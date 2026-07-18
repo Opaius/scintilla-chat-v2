@@ -3,10 +3,10 @@ import type { BillingEvent, BillingProvider } from '../types.js'
 // Reference Creem (Merchant of Record) adapter. Creem is ONE option for Flow A
 // (our plans); swap/extend by adding another BillingProvider — nothing else
 // changes. Webhook signature: HMAC-SHA256(rawBody, webhookSecret), hex, in the
-// `creem-signature` header.
+// `creem-signature` header. Signature is compared in constant time.
 //
-// ponytail: field names below follow Creem's documented webhook shape
-// (eventType + object.metadata). Verify against https://docs.creem.io/code/webhooks
+// ponytail: field names + timestamp units follow Creem's documented webhook
+// shape (eventType + object.metadata). Verify against https://docs.creem.io/code/webhooks
 // before production — the handler degrades safely (unknown events are ignored).
 async function hmacHex(rawBody: string, secret: string): Promise<string> {
 	const key = await crypto.subtle.importKey(
@@ -38,7 +38,12 @@ export const creemProvider: BillingProvider = {
 		return process.env.CREEM_WEBHOOK_SECRET
 	},
 	async verify(rawBody, signature, secret) {
-		return (await hmacHex(rawBody, secret)) === signature
+		const expected = await hmacHex(rawBody, secret)
+		const a = new TextEncoder().encode(expected)
+		const b = new TextEncoder().encode(signature)
+		if (a.length !== b.length) return false
+		// Constant-time comparison to avoid a timing side-channel on the secret.
+		return crypto.timingSafeEqual(a, b)
 	},
 	async map(rawBody) {
 		const payload = JSON.parse(rawBody) as CreemWebhook
@@ -55,6 +60,21 @@ export const creemProvider: BillingProvider = {
 					organizationId: orgId,
 					planId: meta.plan_id ?? 'pro',
 					providerSubscriptionId: subId,
+					// ponytail: Creem timestamps are UNIX seconds; confirm vs docs.
+					periodStart: payload.object?.current_period_start
+						? new Date(payload.object.current_period_start * 1000).toISOString()
+						: undefined,
+					periodEnd: payload.object?.current_period_end
+						? new Date(payload.object.current_period_end * 1000).toISOString()
+						: undefined,
+				})
+				break
+			case 'subscription.updated':
+				events.push({
+					type: 'subscription.updated',
+					organizationId: orgId,
+					providerSubscriptionId: subId,
+					status: payload.object?.status,
 					periodStart: payload.object?.current_period_start
 						? new Date(payload.object.current_period_start * 1000).toISOString()
 						: undefined,

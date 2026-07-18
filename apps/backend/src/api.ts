@@ -100,4 +100,18 @@ export const api = remultApi({
 		const { id, name } = session.user
 		return { id, name, roles: [] }
 	},
+
+	// Stamp organizationId from the tenant context on every org-scoped row and
+	// reject client-supplied mismatches. Backstop against cross-tenant writes
+	// once authenticated writes are enabled (apiPrefilter only filters reads).
+	saving: async (_repo, row) => {
+		const ctx = getTenantContext()
+		if (ctx && 'organizationId' in row) {
+			const r = row as unknown as { organizationId: string }
+			if (r.organizationId && r.organizationId !== ctx.organizationId) {
+				throw new Error('organizationId does not match tenant context')
+			}
+			r.organizationId = ctx.organizationId
+		}
+	},
 })

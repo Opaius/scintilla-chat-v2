@@ -25,7 +25,15 @@ export function requireTenantContext(): TenantContext {
 // Remult-native tenant scoping for org-scoped entities. Declared as each
 // entity's `apiPrefilter`, so every API-layer query is isolated to the current
 // tenant automatically. Server-side repo calls pass organizationId explicitly.
+//
+// Fails closed: without a tenant context an org-scoped query must NOT silently
+// match every row. The backend middleware guarantees a context for every
+// non-webhook request (header / ?room / session); webhooks set their own from
+// the payload before touching the API.
 export function orgApiPrefilter<T>(): EntityFilter<T> {
-	const org = getTenantContext()?.organizationId
-	return (org ? { organizationId: org } : {}) as EntityFilter<T>
+	const ctx = getTenantContext()
+	if (!ctx) {
+		throw new Error('Tenant context required for org-scoped query')
+	}
+	return { organizationId: ctx.organizationId } as EntityFilter<T>
 }
