@@ -3,9 +3,12 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"workspaces": ["apps/*", "packages/*"],
 	"scripts": {
 		"dev": "vite dev",
 		"dev:cf": "bun scripts/dev-cf.mjs",
+		"build": "turbo run build",
+		"cf:dev": "wrangler dev -c apps/frontend/wrangler.jsonc -c apps/backend/wrangler.toml",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "bash scripts/check-all.sh",
@@ -22,6 +25,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.4",
+		"turbo": "^2.9.0",
 		"@cloudflare/workers-types": "^5.20260716.1",
 		"@pandacss/dev": "^1.11.4",
 		"@sveltejs/adapter-cloudflare": "^7.0.1",

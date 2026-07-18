@@ -1,0 +1,19 @@
+{
+	"name": "@scintilla/ui",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/lib/index.ts",
+		"./Button.svelte": "./src/lib/Button.svelte"
+	},
+	"svelte": "./src/lib/index.ts",
+	"dependencies": {
+		"@ark-ui/svelte": "^5.22.1",
+		"clsx": "^2.1.1"
+	},
+	"devDependencies": {
+		"svelte": "^5.56.1",
+		"typescript": "^6.0.3"
+	}
+}
