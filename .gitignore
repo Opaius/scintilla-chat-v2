@@ -32,3 +32,6 @@ dist
 .turbo/
 .dev-logs
 .wrangler-dryrun/
+
+# Serena tool state (not versioned)
+.serena/
