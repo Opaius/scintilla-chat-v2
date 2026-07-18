@@ -1,12 +1,29 @@
+import { runWithTenantContext } from '@scintilla/shared'
 import { Hono } from 'hono'
 import { contextStorage } from 'hono/context-storage'
 import { api } from './api.js'
 import { auth } from './auth/config.js'
+import { handleBillingWebhook } from './billing/webhook.js'
 import type { Bindings } from './env.js'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use(contextStorage())
+
+// Establish tenant context for backend requests. The frontend resolves the org
+// (subdomain / dev fallback) and forwards it on the trusted service-binding hop
+// via the x-organization-id header, overwritten so a client cannot spoof it.
+// Billing webhooks set their own context from the payload instead.
+app.use('*', async (c, next) => {
+	if (c.req.path.startsWith('/api/billing/webhook/')) return next()
+	const orgId = c.req.header('x-organization-id')
+	if (orgId) {
+		return runWithTenantContext({ organizationId: orgId, domain: c.req.header('host') ?? '' }, () =>
+			next(),
+		)
+	}
+	return next()
+})
 
 // Handler for /party/remult — forward WebSocket upgrades to the DO.
 // CORS headers allow the browser to connect directly to this worker
@@ -37,6 +54,17 @@ app.get('/party/remult', async (c) => {
 		return new Response(resp.body, { status: resp.status, headers })
 	}
 	return resp
+})
+
+app.on('POST', '/api/billing/webhook/:provider', async (c) => {
+	const provider = c.req.param('provider')
+	const rawBody = await c.req.text()
+	try {
+		await handleBillingWebhook(provider, rawBody, c.req.raw.headers)
+		return c.json({ received: true })
+	} catch (err) {
+		return c.json({ error: String(err) }, 400)
+	}
 })
 
 app.route('', api)

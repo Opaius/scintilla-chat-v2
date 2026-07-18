@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit'
 import { sequence } from '@sveltejs/kit/hooks'
 import { remult } from 'remult'
-import { runWithTenantContext } from '$lib/server/tenant/context'
+import { getTenantContext, runWithTenantContext } from '$lib/server/tenant/context'
 import { resolveTenantFromHost } from '$lib/server/tenant/domain-resolver'
 
 // ponytail: dev-only tenant fallback. The real multi-tenancy flow
@@ -48,6 +48,10 @@ const handleRemult: Handle = async ({ event, resolve }) => {
 				if (cookie) headers.set('cookie', cookie)
 				const auth = event.request.headers.get('authorization')
 				if (auth) headers.set('authorization', auth)
+				// Forward the resolved tenant so the backend scopes data to this
+				// org. Overwritten here, so a client cannot spoof it.
+				const tenant = getTenantContext()
+				if (tenant?.organizationId) headers.set('x-organization-id', tenant.organizationId)
 				return backend.fetch(rawUrl, {
 					method: (init as RequestInit)?.method ?? 'GET',
 					headers,

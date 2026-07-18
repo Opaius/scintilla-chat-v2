@@ -10,6 +10,9 @@ export interface Bindings {
 	AUTH_TRUSTED_ORIGINS?: string
 	RESEND_API_KEY?: string
 	RESEND_FROM?: string
+	CREEM_API_KEY?: string
+	CREEM_WEBHOOK_SECRET?: string
+	CREEM_TEST_MODE?: string
 	MAX_CONNECTIONS_PER_SHARD?: string
 }
 

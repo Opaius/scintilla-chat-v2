@@ -1,4 +1,5 @@
 import type { RequestHandler } from './$types'
+import { getTenantContext } from '$lib/server/tenant/context'
 
 // Same-origin proxy for Better Auth. The browser calls /api/auth/* on the
 // frontend origin; we forward to the backend worker via the BACKEND service
@@ -15,22 +16,23 @@ import type { RequestHandler } from './$types'
 //    500s POSTs, so we buffer it here with request.text().
 //  - The binding returns a cross-realm Response that SvelteKit's route handler
 //    rejects ("handler should return a Response object"), so we rebuild it here.
-// The target URL host is set to the backend's configured base URL host so
-// request-url/baseURL resolution stays consistent.
+// The target URL host follows the browser connection (http dev / https prod)
+// so the backend sets the session cookie's Secure flag correctly.
 const handler: RequestHandler = async ({ request, platform }) => {
 	const backend = (platform?.env as { BACKEND?: Fetcher } | undefined)?.BACKEND
 	if (!backend) {
 		return new Response('BACKEND binding not configured', { status: 500 })
 	}
 	const url = new URL(request.url)
-	// Scheme follows the browser connection: http in dev, https in prod, so
-	// the backend sets the session cookie's Secure flag correctly.
 	const target = `${url.protocol}//localhost:8788${url.pathname}${url.search}`
 	const hasBody = request.method !== 'GET' && request.method !== 'HEAD'
 	const body = hasBody ? await request.text() : undefined
 	const headers = new Headers(request.headers)
 	headers.delete('content-length')
 	headers.delete('transfer-encoding')
+	// Forward the resolved tenant so the backend scopes auth data to this org.
+	const tenant = getTenantContext()
+	if (tenant?.organizationId) headers.set('x-organization-id', tenant.organizationId)
 	const res = await backend.fetch(target, {
 		method: request.method,
 		headers,

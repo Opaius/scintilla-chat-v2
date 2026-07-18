@@ -1,25 +1,66 @@
 import { DurableObjectLiveQueryStorage, RemultPartySubscriptionServer } from '@scintilla/realtime'
-import { Account, Session, Test, User, Verification } from '@scintilla/shared'
+import {
+	Account,
+	ConsumptionEvent,
+	CreditBalance,
+	getTenantContext,
+	PaymentIntegration,
+	Plan,
+	Session,
+	Subscription,
+	Test,
+	User,
+	Verification,
+} from '@scintilla/shared'
 import { type ClassType, InMemoryLiveQueryStorage, remult } from 'remult'
 import { createD1DataProvider } from 'remult/remult-d1'
 import { remultApi } from 'remult/remult-hono'
 import { auth } from './auth/config.js'
 import { setProvider } from './auth/data-provider.js'
 import type { Bindings } from './env.js'
-import { getTenantContext } from './tenant/context.js'
-import { TenantScopedDataProvider } from './tenant/scoped-dp.js'
+import './billing/providers/index.js'
 
-type Entity = User | Session | Account | Verification | Test
-type EntityClass = typeof User | typeof Session | typeof Account | typeof Verification | typeof Test
-const entities: EntityClass[] = [User, Session, Account, Verification, Test]
+type Entity =
+	| User
+	| Session
+	| Account
+	| Verification
+	| Test
+	| Plan
+	| Subscription
+	| CreditBalance
+	| ConsumptionEvent
+	| PaymentIntegration
+type EntityClass =
+	| typeof User
+	| typeof Session
+	| typeof Account
+	| typeof Verification
+	| typeof Test
+	| typeof Plan
+	| typeof Subscription
+	| typeof CreditBalance
+	| typeof ConsumptionEvent
+	| typeof PaymentIntegration
+const entities: EntityClass[] = [
+	User,
+	Session,
+	Account,
+	Verification,
+	Test,
+	Plan,
+	Subscription,
+	CreditBalance,
+	ConsumptionEvent,
+	PaymentIntegration,
+]
 
 let schemaPromise: Promise<void> | undefined
 
 async function initProvider(env: Bindings) {
 	const inner = createD1DataProvider(env.DB)
-	const provider = new TenantScopedDataProvider(inner)
-	remult.dataProvider = provider
-	setProvider(provider)
+	remult.dataProvider = inner
+	setProvider(inner)
 
 	if (env.REMULT_ROOM) {
 		remult.subscriptionServer = new RemultPartySubscriptionServer(env.REMULT_ROOM, {
@@ -34,9 +75,9 @@ async function initProvider(env: Bindings) {
 		? new DurableObjectLiveQueryStorage(env.REMULT_LIVEQUERY)
 		: new InMemoryLiveQueryStorage()
 
-	if (provider.ensureSchema) {
+	if (inner.ensureSchema) {
 		const entityMetadatas = entities.map((e) => remult.repo(e as ClassType<Entity>).metadata)
-		schemaPromise ??= provider.ensureSchema(entityMetadatas)
+		schemaPromise ??= inner.ensureSchema(entityMetadatas)
 		await schemaPromise
 	}
 }

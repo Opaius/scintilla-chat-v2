@@ -1,12 +1,14 @@
 import { Allow, Entity, Fields, Relations, Validators } from 'remult'
+import { orgApiPrefilter } from '../tenant-context.js'
 
-const Roles = { admin: 'admin' }
+export const Roles = { admin: 'admin' }
 
 @Entity<User>('user', {
 	// admin can do anything
 	allowApiCrud: Roles.admin,
 	// Any one can read
 	allowApiRead: Allow.authenticated,
+	apiPrefilter: orgApiPrefilter,
 })
 export class User {
 	@Fields.string({
@@ -39,7 +41,7 @@ export class User {
 	updatedAt!: Date
 }
 
-@Entity<Session>('session', { allowApiCrud: Roles.admin })
+@Entity<Session>('session', { allowApiCrud: Roles.admin, apiPrefilter: orgApiPrefilter })
 export class Session {
 	@Fields.string({
 		required: true,
@@ -76,7 +78,7 @@ export class Session {
 	user!: User
 }
 
-@Entity<Account>('account', { allowApiCrud: Roles.admin })
+@Entity<Account>('account', { allowApiCrud: Roles.admin, apiPrefilter: orgApiPrefilter })
 export class Account {
 	@Fields.string({
 		required: true,
