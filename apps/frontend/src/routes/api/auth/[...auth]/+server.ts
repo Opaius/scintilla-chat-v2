@@ -5,25 +5,36 @@ import type { RequestHandler } from './$types'
 // binding so the session cookie stays on the frontend origin (enabling SSR
 // session forwarding).
 //
-// We strip host/origin/referer so the backend treats the request as
-// same-origin to itself (no cross-origin validation). The service binding
-// returns a cross-realm Response that SvelteKit's route handler rejects
-// ("handler should return a Response object"), so we rebuild it in this realm.
+// We forward the browser's headers transparently (Origin/Referer/Sec-Fetch-Site
+// included) so Better Auth's origin-check + CSRF protections keep working.
+// Strip nothing: Better Auth validates Origin against trustedOrigins, so
+// dropping it would disable that check.
+//
+// Two realm quirks with the service binding:
+//  - The request body is a cross-realm stream the binding can't read, which
+//    500s POSTs, so we buffer it here with request.text().
+//  - The binding returns a cross-realm Response that SvelteKit's route handler
+//    rejects ("handler should return a Response object"), so we rebuild it here.
+// The target URL host is set to the backend's configured base URL host so
+// request-url/baseURL resolution stays consistent.
 const handler: RequestHandler = async ({ request, platform }) => {
 	const backend = (platform?.env as { BACKEND?: Fetcher } | undefined)?.BACKEND
 	if (!backend) {
 		return new Response('BACKEND binding not configured', { status: 500 })
 	}
 	const url = new URL(request.url)
+	// Scheme follows the browser connection: http in dev, https in prod, so
+	// the backend sets the session cookie's Secure flag correctly.
+	const target = `${url.protocol}//localhost:8788${url.pathname}${url.search}`
+	const hasBody = request.method !== 'GET' && request.method !== 'HEAD'
+	const body = hasBody ? await request.text() : undefined
 	const headers = new Headers(request.headers)
-	headers.delete('host')
-	headers.delete('origin')
-	headers.delete('referer')
-	const target = `http://localhost:8788${url.pathname}${url.search}`
+	headers.delete('content-length')
+	headers.delete('transfer-encoding')
 	const res = await backend.fetch(target, {
 		method: request.method,
 		headers,
-		body: request.body,
+		body,
 	})
 	const text = await res.text()
 	return new Response(text, { status: res.status, headers: new Headers(res.headers) })
