@@ -36,3 +36,13 @@ Remult + Better Auth integration: entities, server API, D1 database, multi-tenan
 | Child | Scope |
 |---|---|
 | `server/tenant/AGENTS.md` | Tenant context, scoped DataProvider, domain resolver |
+
+### realtime/
+| Child | Scope |
+|---|---|
+| `realtime/` | Client WS pool + universal room resolver (browser-safe) |
+
+### server/realtime/
+| Child | Scope |
+|---|---|
+| `server/realtime/AGENTS.md` | Server broadcaster, DO-backed live-query storage, Durable Object rooms |

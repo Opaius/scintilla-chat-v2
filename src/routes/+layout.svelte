@@ -1,9 +1,12 @@
-import '../app.css';
 <script lang="ts">
+import '../app.css'
 import { Remult, remult } from 'remult'
 import { untrack } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
+import { browser } from '$app/environment'
 import favicon from '$lib/assets/favicon.svg'
+import { RemultPartySubscriptionClient } from '$lib/realtime/client'
+import { resolveRoomId } from '$lib/realtime/rooms'
 import type { LayoutData } from './$types'
 
 interface Props {
@@ -42,6 +45,17 @@ $effect(() => {
 		remult.user = data.user
 	})
 })
+
+// Realtime: client-side WebSocket subscription pool, partitioned by tenant.
+if (browser) {
+	remult.apiClient.subscriptionClient = new RemultPartySubscriptionClient({
+		getSocketUrl: (roomName) => {
+			const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+			return `${proto}//${location.host}/party/remult?room=${encodeURIComponent(roomName)}`
+		},
+		resolveRoomId: () => resolveRoomId({ organizationId: data.organizationId }),
+	})
+}
 </script>
 
 <svelte:head>

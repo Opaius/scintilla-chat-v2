@@ -1,10 +1,23 @@
 name = "scintilla-chat"
-compatibility_date = "2025-07-16"
-compatibility_flags = ["nodejs_als"]
-pages_build_output_dir = "./build"
+main = ".svelte-kit/cloudflare/_worker.js"
+assets = { binding = "ASSETS", directory = ".svelte-kit/cloudflare" }
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "scintilla-chat"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "REMULT_ROOM"
+class_name = "RemultPartyRoom"
+
+[[durable_objects.bindings]]
+name = "REMULT_LIVEQUERY"
+class_name = "RemultLiveQueryStorageRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RemultPartyRoom", "RemultLiveQueryStorageRoom"]

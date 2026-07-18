@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"dev:cf": "bun scripts/dev-cf.mjs",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "bash scripts/check-all.sh",
@@ -17,7 +17,8 @@
 	"dependencies": {
 		"@ark-ui/svelte": "^5.22.1",
 		"@nerdfolio/remult-better-auth": "^0.4.3",
-		"better-auth": "^1.6.23"
+		"better-auth": "^1.6.23",
+		"partyserver": "^0.5.6"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.4",
@@ -26,14 +27,15 @@
 		"@sveltejs/adapter-cloudflare": "^7.0.1",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
+		"esbuild": "*",
 		"remult": "^3.3.16",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
+		"sveltekit-cloudflare-durable-objects": "^0.1.1",
 		"typescript": "^6.0.3",
 		"vite": "^8.0.16",
 		"vitest": "^4.1.10",
-		"wrangler": "^4.0.0",
-		"esbuild": "*"
+		"wrangler": "^4.0.0"
 	},
 	"allowScripts": {
 		"@sveltejs/kit": true,

@@ -1,5 +1,6 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
+import cloudflareDoExporter from 'sveltekit-cloudflare-durable-objects';
 import { defineConfig } from 'vite';
 import { transformSync } from 'esbuild';
 
@@ -32,6 +33,9 @@ export default defineConfig({
             },
             adapter: adapter(),
             experimental: { remoteFunctions: true },
+        }),
+        cloudflareDoExporter({
+            durableObjects: ['src/lib/server/realtime/durable-object.ts'],
         }),
     ],
 });

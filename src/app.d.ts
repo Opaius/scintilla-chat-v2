@@ -9,6 +9,8 @@ declare global {
 		interface Platform {
 			env?: {
 				DB: D1Database
+				REMULT_ROOM: import('cloudflare:workers').DurableObjectNamespace
+				REMULT_LIVEQUERY: import('cloudflare:workers').DurableObjectNamespace
 			}
 		}
 	}
