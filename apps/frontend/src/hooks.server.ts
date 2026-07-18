@@ -48,13 +48,11 @@ const handleRemult: Handle = async ({ event, resolve }) => {
 				if (cookie) headers.set('cookie', cookie)
 				const auth = event.request.headers.get('authorization')
 				if (auth) headers.set('authorization', auth)
-				return backend.fetch(
-					new Request(rawUrl, {
-						method: (init as RequestInit)?.method ?? 'GET',
-						headers,
-						body: (init as RequestInit)?.body,
-					}),
-				)
+				return backend.fetch(rawUrl, {
+					method: (init as RequestInit)?.method ?? 'GET',
+					headers,
+					body: (init as RequestInit)?.body,
+				})
 			}
 		: event.fetch
 
