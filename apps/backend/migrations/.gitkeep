@@ -1,0 +1,1 @@
+# wrangler needs the migrations directory to exist even before the first migration.

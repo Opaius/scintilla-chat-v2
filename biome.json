@@ -9,13 +9,16 @@
 	"files": {
 		"ignoreUnknown": false,
 		"includes": [
-			"src/**/*.ts",
-			"src/**/*.svelte",
-			"!**/styled-system",
+			"apps/**/*.{ts,svelte,toml,json,jsonc}",
+			"packages/**/*.{ts,toml,json,jsonc}",
+			"*.{ts,json,jsonc,toml}",
+			"!**/dist",
 			"!**/.svelte-kit",
+			"!**/node_modules",
+			"!**/styled-system",
 			"!**/build",
 			"!**/.wrangler",
-			"!**/packages"
+			"!**/.fallow"
 		]
 	},
 	"formatter": {

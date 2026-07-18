@@ -1,6 +1,6 @@
 # fallow.toml — Codebase analysis configuration
 
-entry = ["src/**/*.{ts,svelte}"]
+entry = ["apps/**/src/**/*.{ts,svelte}", "packages/**/src/**/*.ts"]
 
 [duplicates]
 minOccurrences = 3

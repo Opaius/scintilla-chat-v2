@@ -1,0 +1,32 @@
+{
+	"name": "@scintilla/backend",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev --port 8788",
+		"deploy": "wrangler deploy",
+		"build": "wrangler deploy --dry-run",
+		"check": "biome check src/"
+	},
+	"turbo": {
+		"build": {
+			"outputs": []
+		}
+	},
+	"dependencies": {
+		"@nerdfolio/remult-better-auth": "^0.4.3",
+		"@scintilla/shared": "workspace:*",
+		"@scintilla/realtime": "workspace:*",
+		"better-auth": "^1.6.23",
+		"hono": "^4.12.25",
+		"partyserver": "^0.5.6",
+		"partysocket": "^1.2.0",
+		"remult": "^3.3.16"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20260716.1",
+		"typescript": "^6.0.3",
+		"wrangler": "^4.0.0"
+	}
+}
