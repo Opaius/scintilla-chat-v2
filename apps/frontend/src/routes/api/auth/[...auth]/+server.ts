@@ -1,5 +1,5 @@
-import type { RequestHandler } from './$types'
 import { getTenantContext } from '$lib/server/tenant/context'
+import type { RequestHandler } from './$types'
 
 // Same-origin proxy for Better Auth. The browser calls /api/auth/* on the
 // frontend origin; we forward to the backend worker via the BACKEND service

@@ -12,13 +12,20 @@ import {
 	User,
 	Verification,
 } from '@scintilla/shared'
-import { type ClassType, InMemoryLiveQueryStorage, remult } from 'remult'
+import {
+	type ClassType,
+	type DataProvider,
+	InMemoryLiveQueryStorage,
+	remult,
+	withRemult,
+} from 'remult'
 import { createD1DataProvider } from 'remult/remult-d1'
 import { remultApi } from 'remult/remult-hono'
-import { auth } from './auth/config.js'
+import { getAuth } from './auth/config.js'
 import { setProvider } from './auth/data-provider.js'
 import type { Bindings } from './env.js'
 import './billing/providers/index.js'
+import { seedPlans } from './billing/seed.js'
 
 type Entity =
 	| User
@@ -57,8 +64,8 @@ const entities: EntityClass[] = [
 
 let schemaPromise: Promise<void> | undefined
 
-async function initProvider(env: Bindings) {
-	const inner = createD1DataProvider(env.DB)
+export async function initProvider(env: Bindings, dataProvider?: DataProvider) {
+	const inner = dataProvider ?? createD1DataProvider(env.DB)
 	remult.dataProvider = inner
 	setProvider(inner)
 
@@ -80,6 +87,22 @@ async function initProvider(env: Bindings) {
 		schemaPromise ??= inner.ensureSchema(entityMetadatas)
 		await schemaPromise
 	}
+	await seedPlans()
+}
+
+// Run `fn` inside a Remult request cycle with the per-request D1 data provider.
+// Custom Hono routes (checkout, webhook) bypass remultApi's initRequest and must
+// establish the context + provider themselves. ponytail: no per-request caching of
+// the provider; D1 provider is cheap to construct.
+export async function withEnv(env: Bindings, fn: () => Promise<void>) {
+	const inner = createD1DataProvider(env.DB)
+	await withRemult(
+		async () => {
+			await initProvider(env, inner)
+			await fn()
+		},
+		{ dataProvider: inner },
+	)
 }
 
 export const api = remultApi({
@@ -95,23 +118,9 @@ export const api = remultApi({
 	},
 
 	getUser: async (c) => {
-		const session = await auth.api.getSession({ headers: c.req.raw.headers })
+		const session = await getAuth().api.getSession({ headers: c.req.raw.headers })
 		if (!session) return undefined
 		const { id, name } = session.user
 		return { id, name, roles: [] }
-	},
-
-	// Stamp organizationId from the tenant context on every org-scoped row and
-	// reject client-supplied mismatches. Backstop against cross-tenant writes
-	// once authenticated writes are enabled (apiPrefilter only filters reads).
-	saving: async (_repo, row) => {
-		const ctx = getTenantContext()
-		if (ctx && 'organizationId' in row) {
-			const r = row as unknown as { organizationId: string }
-			if (r.organizationId && r.organizationId !== ctx.organizationId) {
-				throw new Error('organizationId does not match tenant context')
-			}
-			r.organizationId = ctx.organizationId
-		}
 	},
 })

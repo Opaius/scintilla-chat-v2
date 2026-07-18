@@ -2,6 +2,7 @@
 // Stripe, PayPal, crypto, manual) implements BillingProvider so Flow A (our
 // plans) and Flow B (reader's clients) share one metering/enforcement path.
 // No provider is hard-coded — register an adapter and the rest is unchanged.
+import type { Bindings } from '../env.js'
 
 export type BillingEvent =
 	| {
@@ -36,7 +37,7 @@ export type BillingEvent =
 export interface BillingProvider {
 	readonly key: string
 	readonly signatureHeader: string
-	getSecret(organizationId: string): Promise<string | undefined>
+	getSecret(organizationId: string, env?: Bindings): Promise<string | undefined>
 	verify(rawBody: string, signature: string, secret: string): Promise<boolean>
 	map(rawBody: string): Promise<BillingEvent[]>
 }

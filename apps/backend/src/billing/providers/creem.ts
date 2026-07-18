@@ -1,3 +1,4 @@
+import type { Bindings } from '../../env.js'
 import type { BillingEvent, BillingProvider } from '../types.js'
 
 // Reference Creem (Merchant of Record) adapter. Creem is ONE option for Flow A
@@ -19,6 +20,22 @@ async function hmacHex(rawBody: string, secret: string): Promise<string> {
 	const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
 	return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
+// Constant-time compare that works in workerd (Web Crypto has no timingSafeEqual).
+function safeEqual(a: Uint8Array, b: Uint8Array): boolean {
+	let diff = a.length ^ b.length
+	for (let i = 0; i < a.length; i++) {
+		diff |= (a[i] ?? 0) ^ (b[i] ?? 0)
+	}
+	return diff === 0
+}
+function periodDates(obj?: CreemWebhook['object']) {
+	const toISO = (s?: number) => (s ? new Date(s * 1000).toISOString() : undefined)
+	// ponytail: Creem timestamps are UNIX seconds; confirm vs https://docs.creem.io/code/webhooks.
+	return {
+		periodStart: toISO(obj?.current_period_start),
+		periodEnd: toISO(obj?.current_period_end),
+	}
+}
 
 interface CreemWebhook {
 	eventType: string
@@ -34,16 +51,17 @@ interface CreemWebhook {
 export const creemProvider: BillingProvider = {
 	key: 'creem',
 	signatureHeader: 'creem-signature',
-	async getSecret() {
-		return process.env.CREEM_WEBHOOK_SECRET
+	// Flow A (our plans): the platform's MoR secret comes from the Worker env
+	// binding, never process.env (workers have no process global).
+	async getSecret(_organizationId: string, env?: Bindings) {
+		return env?.CREEM_WEBHOOK_SECRET
 	},
 	async verify(rawBody, signature, secret) {
 		const expected = await hmacHex(rawBody, secret)
 		const a = new TextEncoder().encode(expected)
 		const b = new TextEncoder().encode(signature)
-		if (a.length !== b.length) return false
 		// Constant-time comparison to avoid a timing side-channel on the secret.
-		return crypto.timingSafeEqual(a, b)
+		return safeEqual(a, b)
 	},
 	async map(rawBody) {
 		const payload = JSON.parse(rawBody) as CreemWebhook
@@ -60,13 +78,7 @@ export const creemProvider: BillingProvider = {
 					organizationId: orgId,
 					planId: meta.plan_id ?? 'pro',
 					providerSubscriptionId: subId,
-					// ponytail: Creem timestamps are UNIX seconds; confirm vs docs.
-					periodStart: payload.object?.current_period_start
-						? new Date(payload.object.current_period_start * 1000).toISOString()
-						: undefined,
-					periodEnd: payload.object?.current_period_end
-						? new Date(payload.object.current_period_end * 1000).toISOString()
-						: undefined,
+					...periodDates(payload.object),
 				})
 				break
 			case 'subscription.updated':
@@ -75,12 +87,7 @@ export const creemProvider: BillingProvider = {
 					organizationId: orgId,
 					providerSubscriptionId: subId,
 					status: payload.object?.status,
-					periodStart: payload.object?.current_period_start
-						? new Date(payload.object.current_period_start * 1000).toISOString()
-						: undefined,
-					periodEnd: payload.object?.current_period_end
-						? new Date(payload.object.current_period_end * 1000).toISOString()
-						: undefined,
+					...periodDates(payload.object),
 				})
 				break
 			case 'subscription.expired':

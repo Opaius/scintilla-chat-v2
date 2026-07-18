@@ -22,10 +22,18 @@ tag = "v1"
 new_classes = ["RemultPartyRoom", "RemultLiveQueryStorageRoom"]
 
 [vars]
-AUTH_BASE_URL = "http://localhost:8788/api/auth"
+BETTER_AUTH_URL = "http://localhost:8788"
+BETTER_AUTH_SECRET = "dev-secret-change-in-production-32chars"
 AUTH_TRUSTED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8788"
 RESEND_API_KEY = ""
 RESEND_FROM = "noreply@scintilla.chat"
+
+# ── Creem (Merchant of Record, Flow A) ──
+# Secrets belong in `wrangler secret put` for production; these dev placeholders
+# let the webhook + checkout bindings resolve locally.
+CREEM_API_KEY = ""
+CREEM_WEBHOOK_SECRET = "dev-creem-webhook-secret"
+CREEM_TEST_MODE = "true"
 
 # ── Realtime routing ──
 MAX_CONNECTIONS_PER_SHARD = "100"

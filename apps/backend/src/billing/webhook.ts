@@ -1,5 +1,6 @@
 import { runWithTenantContext, Subscription } from '@scintilla/shared'
 import { remult } from 'remult'
+import type { Bindings } from '../env.js'
 import type { BillingEvent, BillingProvider } from './types.js'
 
 // Registry of providers. Register a Creem/Dodo/Stripe/... adapter and the
@@ -10,14 +11,19 @@ export function registerBillingProvider(p: BillingProvider) {
 	providers.set(p.key, p)
 }
 
-export async function handleBillingWebhook(providerKey: string, rawBody: string, headers: Headers) {
+export async function handleBillingWebhook(
+	providerKey: string,
+	rawBody: string,
+	headers: Headers,
+	env?: Bindings,
+) {
 	const provider = providers.get(providerKey)
 	if (!provider) throw new Error(`Unknown billing provider: ${providerKey}`)
 	const signature = headers.get(provider.signatureHeader) ?? ''
 	// Flow A (our plans): a single global secret for the platform's provider.
 	// Flow B (reader integrations) needs a per-org secret resolved after parsing
 	// the payload — tracked as a seam gap (getSecret receives the org post-parse).
-	const secret = await provider.getSecret('*')
+	const secret = await provider.getSecret('*', env)
 	if (!secret) throw new Error(`No webhook secret for provider ${providerKey}`)
 	if (!(await provider.verify(rawBody, signature, secret))) {
 		throw new Error('Invalid webhook signature')

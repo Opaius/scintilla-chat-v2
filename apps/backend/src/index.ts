@@ -1,8 +1,9 @@
-import { getTenantContext, runWithTenantContext } from '@scintilla/shared'
+import { getTenantContext, runWithTenantContext, Subscription } from '@scintilla/shared'
 import { type Context, Hono } from 'hono'
 import { contextStorage } from 'hono/context-storage'
-import { api } from './api.js'
-import { auth } from './auth/config.js'
+import { remult } from 'remult'
+import { api, withEnv } from './api.js'
+import { getAuth, initAuth } from './auth/config.js'
 import { handleBillingWebhook } from './billing/webhook.js'
 import type { Bindings } from './env.js'
 
@@ -20,7 +21,7 @@ async function resolveOrgId(c: Context): Promise<string | undefined> {
 	const room = c.req.query('room')
 	if (room?.startsWith('org:')) return room.slice(4)
 	try {
-		const session = await auth.api.getSession({ headers: c.req.raw.headers })
+		const session = await getAuth().api.getSession({ headers: c.req.raw.headers })
 		const org = (session?.user as { organizationId?: string } | undefined)?.organizationId
 		if (org) return org
 	} catch {
@@ -33,6 +34,8 @@ async function resolveOrgId(c: Context): Promise<string | undefined> {
 // cannot be resolved to a tenant is rejected (400), so org-scoped queries can
 // never fall back to match-all. Billing webhooks set their own context.
 app.use('*', async (c, next) => {
+	// Bootstrap per-isolate singletons from the Worker env (no process.env in workers).
+	initAuth(c.env)
 	if (c.req.path.startsWith('/api/billing/webhook/')) return next()
 	const orgId = await resolveOrgId(c)
 	if (!orgId) return c.text('Unknown tenant', 400)
@@ -74,7 +77,9 @@ app.on('POST', '/api/billing/webhook/:provider', async (c) => {
 	const provider = c.req.param('provider')
 	const rawBody = await c.req.text()
 	try {
-		await handleBillingWebhook(provider, rawBody, c.req.raw.headers)
+		await withEnv(c.env, async () => {
+			await handleBillingWebhook(provider, rawBody, c.req.raw.headers, c.env)
+		})
 		return c.json({ received: true })
 	} catch {
 		// Never echo internal error text to the caller.
@@ -82,9 +87,45 @@ app.on('POST', '/api/billing/webhook/:provider', async (c) => {
 	}
 })
 
+app.post('/api/billing/checkout', async (c) => {
+	const session = await getAuth().api.getSession({ headers: c.req.raw.headers })
+	if (!session?.user) return c.json({ error: 'unauthenticated' }, 401)
+	const rawUser = session.user as Record<string, unknown>
+	const orgId = typeof rawUser?.organizationId === 'string' ? rawUser.organizationId : undefined
+	if (!orgId) return c.json({ error: 'no tenant context' }, 400)
+	const body = await c.req.json<{ planId?: string }>().catch(() => ({ planId: undefined }))
+	const planId = body.planId
+	if (!planId) return c.json({ error: 'planId required' }, 400)
+	const env = c.env
+	// Real Creem checkout needs a product mapping we don't store yet; until then
+	// (or without keys) we record the subscription directly so the flow is
+	// testable end-to-end in dev. ponytail: wire real Creem checkout when
+	// Plan.creemProductId exists.
+	await withEnv(c.env, async () => {
+		await runWithTenantContext(
+			{ organizationId: orgId, domain: c.req.header('host') ?? '' },
+			async () => {
+				await remult.repo(Subscription).upsert({
+					where: { organizationId: orgId, planId },
+					set: {
+						organizationId: orgId,
+						planId,
+						provider: 'creem',
+						providerSubscriptionId: `dev_${orgId}_${planId}`,
+						status: 'active',
+						currentPeriodStart: new Date(),
+						currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+					},
+				})
+			},
+		)
+	})
+	return c.json({ ok: true, dev: !env.CREEM_API_KEY })
+})
+
 app.route('', api)
 
-app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
+app.on(['POST', 'GET'], '/api/auth/*', (c) => getAuth().handler(c.req.raw))
 
 function corsHeaders(origin: string | undefined): Record<string, string> {
 	return {
