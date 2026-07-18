@@ -2,8 +2,10 @@ import { getTenantContext, runWithTenantContext, Subscription } from '@scintilla
 import { type Context, Hono } from 'hono'
 import { contextStorage } from 'hono/context-storage'
 import { remult } from 'remult'
+import { createD1DataProvider } from 'remult/remult-d1'
 import { api, withEnv } from './api.js'
 import { getAuth, initAuth } from './auth/config.js'
+import { setProvider } from './auth/data-provider.js'
 import { handleBillingWebhook } from './billing/webhook.js'
 import type { Bindings } from './env.js'
 
@@ -22,7 +24,8 @@ async function resolveOrgId(c: Context): Promise<string | undefined> {
 	if (room?.startsWith('org:')) return room.slice(4)
 	try {
 		const session = await getAuth().api.getSession({ headers: c.req.raw.headers })
-		const org = (session?.user as { organizationId?: string } | undefined)?.organizationId
+		const u = session?.user as { organizationId?: string; id?: string } | undefined
+		const org = u?.organizationId ?? u?.id
 		if (org) return org
 	} catch {
 		// No data provider / no session yet — fall through to reject.
@@ -36,7 +39,13 @@ async function resolveOrgId(c: Context): Promise<string | undefined> {
 app.use('*', async (c, next) => {
 	// Bootstrap per-isolate singletons from the Worker env (no process.env in workers).
 	initAuth(c.env)
-	if (c.req.path.startsWith('/api/billing/webhook/')) return next()
+	// Resolve the Better Auth adapter's data provider for every request. This is
+	// independent of the remult request cycle (setProvider just fulfills a
+	// promise), so it must run here in the middleware — auth routes are exempt
+	// from initRequest and would otherwise hang awaiting the provider.
+	setProvider(createD1DataProvider(c.env.DB))
+	if (c.req.path.startsWith('/api/billing/webhook/') || c.req.path.startsWith('/api/auth/'))
+		return next()
 	const orgId = await resolveOrgId(c)
 	if (!orgId) return c.text('Unknown tenant', 400)
 	return runWithTenantContext({ organizationId: orgId, domain: c.req.header('host') ?? '' }, () =>
@@ -91,7 +100,9 @@ app.post('/api/billing/checkout', async (c) => {
 	const session = await getAuth().api.getSession({ headers: c.req.raw.headers })
 	if (!session?.user) return c.json({ error: 'unauthenticated' }, 401)
 	const rawUser = session.user as Record<string, unknown>
-	const orgId = typeof rawUser?.organizationId === 'string' ? rawUser.organizationId : undefined
+	const orgId =
+		(typeof rawUser?.organizationId === 'string' ? rawUser.organizationId : undefined) ??
+		(typeof rawUser?.id === 'string' ? rawUser.id : undefined)
 	if (!orgId) return c.json({ error: 'no tenant context' }, 400)
 	const body = await c.req.json<{ planId?: string }>().catch(() => ({ planId: undefined }))
 	const planId = body.planId

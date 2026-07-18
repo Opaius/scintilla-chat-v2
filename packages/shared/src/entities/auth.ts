@@ -25,7 +25,7 @@ export class User {
 
 	@Fields.string({ required: true, validate: [Validators.email()], includeInApi: false })
 	email = ''
-	@Fields.string({ required: true, includeInApi: false })
+	@Fields.string({ includeInApi: false })
 	organizationId = ''
 
 	@Fields.boolean({ required: true, defaultValue: () => false, includeInApi: false })
@@ -69,7 +69,7 @@ export class Session {
 
 	@Fields.string({ required: false })
 	userAgent = ''
-	@Fields.string({ required: true })
+	@Fields.string({ includeInApi: false })
 	organizationId = ''
 
 	@Fields.string({ required: true })
@@ -120,7 +120,7 @@ export class Account {
 
 	@Fields.string({ required: false, allowApiUpdate: false })
 	password = ''
-	@Fields.string({ required: true })
+	@Fields.string({ includeInApi: false })
 	organizationId = ''
 
 	@Fields.createdAt({ required: true, defaultValue: () => new Date(), allowApiUpdate: false })
